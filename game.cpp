@@ -1,14 +1,20 @@
 #include "game.hpp"
 #include <cstdlib>
 #include <ctime>
+#include <cstring>
 
 using namespace blit;
 
 static const int WIDTH = 128;
 static const int HEIGHT = 128;
 
-static bool grid[WIDTH][HEIGHT];
-static bool next[WIDTH][HEIGHT];
+// Two buffers we will swap each generation
+static bool buffer_a[WIDTH * HEIGHT];
+static bool buffer_b[WIDTH * HEIGHT];
+static bool *grid = buffer_a;   // current state
+static bool *next = buffer_b;   // next state being written
+
+static inline int idx(int x, int y) { return x + y * WIDTH; }
 
 static uint32_t last_update = 0;
 static const uint32_t UPDATE_INTERVAL = 100;
@@ -16,61 +22,71 @@ static const uint32_t UPDATE_INTERVAL = 100;
 void init() {
     set_screen_mode(ScreenMode::hires);
 
-    // seed random
     for(int x = 0; x < WIDTH; x++) {
         for(int y = 0; y < HEIGHT; y++) {
-            grid[x][y] = (blit::random() % 2);
+            grid[idx(x,y)] = (blit::random() % 2);
         }
     }
 }
 
-int count_neighbors(int x, int y) {
+// Count Moore neighborhood with toroidal wrap
+static inline int count_neighbors(int x, int y) {
     int count = 0;
-    for(int dx=-1; dx<=1; dx++) {
-        for(int dy=-1; dy<=1; dy++) {
-            if(dx == 0 && dy == 0) continue; // skip self
-            int nx = (x + dx + WIDTH) % WIDTH;
-            int ny = (y + dy + HEIGHT) % HEIGHT;
-            if(grid[nx][ny]) count++;
-        }
-    }
+    // precompute wrapped coordinates to avoid repeated modulo
+    int xm1 = (x == 0 ? WIDTH - 1 : x - 1);
+    int xp1 = (x == WIDTH - 1 ? 0 : x + 1);
+    int ym1 = (y == 0 ? HEIGHT - 1 : y - 1);
+    int yp1 = (y == HEIGHT - 1 ? 0 : y + 1);
+
+    // Unrolled neighbor accesses (8)
+    count += grid[idx(xm1, ym1)];
+    count += grid[idx(x,   ym1)];
+    count += grid[idx(xp1, ym1)];
+    count += grid[idx(xm1, y  )];
+    count += grid[idx(xp1, y  )];
+    count += grid[idx(xm1, yp1)];
+    count += grid[idx(x,   yp1)];
+    count += grid[idx(xp1, yp1)];
     return count;
 }
 
 void update(uint32_t time) {
     if(time - last_update < UPDATE_INTERVAL) return;
-
     last_update = time;
 
-    for(int x = 0; x < WIDTH; x++) {
-        for(int y = 0; y < HEIGHT; y++) {
+    for(int y = 0; y < HEIGHT; y++) {
+        for(int x = 0; x < WIDTH; x++) {
             int n = count_neighbors(x, y);
-            if(grid[x][y]) {
-                next[x][y] = (n == 2 || n == 3);
-            } else {
-                next[x][y] = (n == 3);
-            }
+            bool alive = grid[idx(x,y)];
+            next[idx(x,y)] = (alive ? (n == 2 || n == 3) : (n == 3));
         }
     }
 
-    for(int x = 0; x < WIDTH; x++) {
-        for(int y = 0; y < HEIGHT; y++) {
-            grid[x][y] = next[x][y];
-        }
-    }
-        
+    // swap buffers instead of copying
+    std::swap(grid, next);
 }
 
 void render(uint32_t time) {
     screen.pen = Pen(0, 0, 0);
     screen.clear();
+
     screen.pen = Pen(255, 255, 255);
 
-    for(int x=0; x<WIDTH; x++) {
-        for(int y=0; y<HEIGHT; y++) {
-            if(grid[x][y]) {
-                screen.pixel(Point(x,y));
+    // Batch horizontal runs of live cells into rectangle fills to reduce per-pixel overhead
+    for(int y = 0; y < HEIGHT; y++) {
+        int run_start = -1;
+        for(int x = 0; x < WIDTH; x++) {
+            bool alive = grid[idx(x,y)];
+            if(alive) {
+                if(run_start == -1) run_start = x; // start new run
+            } else if(run_start != -1) {
+                // end previous run
+                screen.rectangle(Rect(run_start, y, x - run_start, 1));
+                run_start = -1;
             }
+        }
+        if(run_start != -1) {
+            screen.rectangle(Rect(run_start, y, WIDTH - run_start, 1));
         }
     }
 }
