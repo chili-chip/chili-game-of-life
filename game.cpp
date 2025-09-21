@@ -48,6 +48,14 @@ static inline int count_neighbors(int x, int y) {
 }
 
 void update(uint32_t time) {
+    // check button for reset
+        if(blit::buttons.released & Button::MENU) {
+            for(int x = 0; x < WIDTH; x++) {
+                for(int y = 0; y < HEIGHT; y++) {
+                    grid[idx(x,y)] = (blit::random() % 2);
+                }
+            }
+        }
     if(time - last_update < UPDATE_INTERVAL) return;
     last_update = time;
 
