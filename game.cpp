@@ -1,7 +1,4 @@
 #include "game.hpp"
-#include <cstdlib>
-#include <ctime>
-#include <cstring>
 
 using namespace blit;
 
