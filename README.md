@@ -1,68 +1,53 @@
-# Game of life
+# Conway's Game of Life
 
-![Build](https://github.com/chili-chip/32blit-boilerplate/workflows/Build/badge.svg)
+[![Build](https://github.com/chili-chip/chili-game-of-life/actions/workflows/build.yml/badge.svg)](https://github.com/chili-chip/chili-game-of-life/actions/workflows/build.yml)
 
-This is a basic template for starting game projects for VGC Zero, using 32blit sdk. It shows the basic
-code layout and asset pipeline, hopefully giving folk a starting point for
-any new projects.
+Conway's cellular automaton running full screen on the ChiliChip **VGC Zero** (128x128), built on the
+[chilichip fork of the 32blit SDK](https://github.com/chili-chip/32blit-sdk).
+It also runs on desktop (SDL) and in the browser: [try it on chilichip.eu](https://chilichip.eu/games/game-of-life/).
 
-It's based on the original `template` project from the 
-[32blit-boilerplate](https://github.com/32blit/32blit-boilerplate), with added support for chilichip's vgc zero.
+Every pixel is a cell. The board starts from a random seed and wraps around at the edges. A new
+generation is computed every 100 ms with the usual rules: a live cell with two or three live
+neighbours survives, a dead cell with exactly three comes alive, everything else dies.
 
-## Usage
+## Controls
 
-[Use this template](https://github.com/chili-chip/32blit-boilerplate/generate) to
-generate your own project.
+| Button | Action |
+| --- | --- |
+| MENU | Restart with a new random seed |
 
-* Edit the CMakeList.txt file to set the name of your project
-* Edit the metadata.yml file to set the information for your project
-* Edit the LICENSE file to set your name on the license
-* Write lots of super cool code!
+On desktop, **Esc** is MENU.
 
-You should then be able to follow the usual build instructions.
+## Code layout
 
-For local builds this is:
+Everything is in `game.cpp`: two 128x128 buffers that are swapped each generation, the neighbour
+count with toroidal wrap, and a renderer that draws runs of live cells as single rectangles.
+
+## Building
+
+New to the SDK? Start with the [Linux quickstart](https://chilichip.eu/docs/game-sdk/quickstart/linux-quickstart/) on chilichip.eu. It installs the toolchain and clones `32blit-sdk`, `pico-sdk` and `pico-extras` next to this repo. CMake 3.28 or newer is needed for the presets in `CMakePresets.json`.
+
+Desktop (SDL):
 ```
-mkdir build
-cd build
-cmake -D32BLIT_DIR=/path/to/32blit-sdk/ ..
+mkdir build && cd build
+cmake -D32BLIT_DIR=../../32blit-sdk ..
+make
+./game
 ```
 
-For vgc zero builds this is:
+VGC Zero:
 ```
-mkdir build.vgc
-cd build.vgc
+mkdir build.vgc && cd build.vgc
 cmake .. \
   -D32BLIT_DIR=../../32blit-sdk \
   -DPICO_SDK_PATH=../../pico-sdk \
   -DPICO_BOARD=chilichip_vgc \
   -DPICO_PLATFORM=rp2350-arm-s \
   -DCMAKE_TOOLCHAIN_FILE=../../32blit-sdk/pico2.toolchain
+make
 ```
-[detailed instructions for vgc](https://github.com/chili-chip/32blit-sdk/blob/master/docs/vgc.md)
+This produces a `.uf2` you can copy onto the console's `RP2350` drive. To build an installable `.blit` for the VGC Zero loader instead, add `-DBLIT_EXECUTABLE_PICO_BLIT=1` and install it with `32blit install game.blit`. See the [VGC build guide](https://github.com/chili-chip/32blit-sdk/blob/master/docs/vgc.md) for details, including flashing over SWD.
 
-Platform/Editor specific insctuctions [can be found in the fork of the main 32blit repo](https://github.com/chili-chip/32blit-sdk/blob/master/docs/vgc.md)
-(For Visual Studio, you should follow the "Option 2" instructions, as the boilerplate does not contain a solution file)
+## Licence
 
-## VS Code Setup (Optional but Recommended)
-
-For the best development experience with VS Code, install these extensions:
-- **CMake Tools** - For building and configuring the project with CMake
-- **Cortex-Debug** - For debugging on the Pico 2 with OpenOCD
-
-These extensions enable integrated building, flashing, and debugging directly from VS Code.
-
-## Flashing to Pico via SWD
-
-Make sure you have:
-- raspberrypi's [openocd fork ](https://github.com/raspberrypi/openocd) installed (rp2350 support not yet in openocd) 
-- Pico Debugger or Picoprobe connected via SWD pins (SWDIO, SWCLK, GND)
-- The game has been built successfully (produces `game.elf`)
-
-
-To flash the built executable to your Raspberry Pi Pico using the Pico Debugger over SWD:
-
-```bash
-cd build
-openocd -f interface/cmsis-dap.cfg -f target/rp2350.cfg -c "adapter speed 5000; program "game.elf" verify reset exit"
-```
+MIT, see [LICENSE](LICENSE).
